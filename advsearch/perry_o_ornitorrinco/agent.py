@@ -20,3 +20,10 @@ def make_move(the_board, color):
     # Remova-o e coloque a sua implementacao da poda alpha-beta
     return random.choice([(2, 3), (4, 5), (5, 4), (3, 2)])
 
+'''
+Minhas Notas:
+Recebe um tabuleiro e uma cor e retorna um movimento
+Um movimento é uma tupla com dois inteiros com valores entre 0 e 7
+Caso não haja movimento valido, retorna a tupla -1, -1
+O primeiro inteiro é a coluna e o segundo a linha
+'''
