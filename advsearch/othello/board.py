@@ -17,11 +17,13 @@ def from_string(string):
     b = Board()
     # resets piece_count and set it during board construction
     b.piece_count = {b.BLACK: 0, b.WHITE: 0, b.EMPTY: 0}
-    for lineno, line in enumerate(string.split('\n')):
+    for lineno, line in enumerate(string.strip().split('\n')):
         line.strip()  # cuts the \n
+
         for colno, col in enumerate(line):
             b.tiles[lineno][colno] = col
             b.piece_count[col] += 1
+
     return b
 
 
@@ -39,6 +41,7 @@ class Board(object):
     ........
     ........
     ........
+
     Coordinate system is such that x grows from left to right and y from top to bottom:
       01234567 --> x axis
     0 ........
@@ -54,9 +57,11 @@ class Board(object):
     v
     y axis
     """
+
     BLACK = 'B'
     WHITE = 'W'
     EMPTY = '.'
+
     # direction of neighbor tiles (add to current tile coordinates to obtain neighbor)
     UP = (0, -1)
     DOWN = (0, 1)
@@ -66,8 +71,16 @@ class Board(object):
     UP_RIGHT = (1, -1)
     DOWN_LEFT = (-1, 1)
     DOWN_RIGHT = (1, 1)
+
     # list with all directions
     DIRECTIONS = [UP, DOWN, LEFT, RIGHT, UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT]
+
+    # for printing on text user interface
+    PIECEMAP = {
+        BLACK: '[black]⬤[/fg]',
+        WHITE: '[ffffff]⬤[/fg]',
+        EMPTY: '-'
+    }
 
     def __init__(self):
         """
@@ -76,11 +89,15 @@ class Board(object):
         :return:
         """
         self.tiles = [[self.EMPTY] * 8 for i in range(8)]
+
         self.tiles[3][3], self.tiles[3][4] = self.WHITE, self.BLACK
         self.tiles[4][3], self.tiles[4][4] = self.BLACK, self.WHITE
+
         # cache legal moves in attempt to reduce function calls
         self._legal_moves = {self.BLACK: None, self.WHITE: None}
+
         self.piece_count = {self.BLACK: 2, self.WHITE: 2, self.EMPTY: 60}
+
         # stores the flipped tiles at each move
         self.flipped = set()
 
@@ -109,7 +126,29 @@ class Board(object):
         """
         no_moves_black = len(self.legal_moves(self.BLACK)) == 0
         no_moves_white = len(self.legal_moves(self.WHITE)) == 0
+
         return no_moves_black and no_moves_white
+
+    def num_pieces(self, color: str) -> int:
+        """
+        Returns the number of pieces of the given color
+        :param color:
+        :return:
+        """
+        return self.piece_count[color]
+
+    def winner(self):
+        """
+        Returns the color that has won the match, or None if it is a draw
+        This only makes sense if self is a terminal state (not checked here)
+        :return:
+        """
+        if self.piece_count[self.BLACK] > self.piece_count[self.WHITE]:
+            return self.BLACK
+        elif self.piece_count[self.BLACK] < self.piece_count[self.WHITE]:
+            return self.WHITE
+        else:
+            return None
 
     def find_bracket(self, move, color, direction):
         """
@@ -126,14 +165,18 @@ class Board(object):
         tx, ty = move
         tx += dx
         ty += dy
+
         opp = self.BLACK if color == self.WHITE else self.WHITE  # inline opponent calc.
+
         if not (0 <= tx <= 7 and 0 <= ty <= 7) or self.tiles[tx][ty] != opp:
             return False
+
         while self.tiles[tx][ty] == opp:  # putting is_within_bounds here yields more calls
             tx += dx
             ty += dy
             if not (0 <= tx <= 7 and 0 <= ty <= 7):  # self.is_within_bounds((tx, ty)):
                 return False
+
         if self.tiles[tx][ty] == self.EMPTY:
             return False
         return tx, ty
@@ -156,40 +199,60 @@ class Board(object):
         tx += dx
         ty += dy
         opp = self.BLACK if color == self.WHITE else self.WHITE  # inline opponent calc.
+
         if not (0 <= tx <= 7 and 0 <= ty <= 7) or self.tiles[tx][ty] != opp:  # color:
             return False
+
         while self.tiles[tx][ty] == opp:
             tx += dx
             ty += dy
             if not (0 <= tx <= 7 and 0 <= ty <= 7):
                 return False
+
         if self.tiles[tx][ty] != self.EMPTY:
             return False
         return tx, ty
 
+    def copy(self):
+        """
+        Returns a copy of this board object
+        :return:
+        """
+        return from_string(self.__str__())
+
     def process_move(self, position, color):
         """
         Executes the placement of a tile of a given color
-        in a given position
+        in a given position. Note that this is done in-place,
+        changing the current board object! If you want to do lookahead searches,
+        make sure to copy the 'original' board first
         :param position:
         :param color:
         :return: bool
         """
+
+        self.flipped = set()  # resets flipped tiles
+
         # as the board is represented row-column, swaps coords to col-row
         position = position[1], position[0]
+
         if color not in [self.WHITE, self.BLACK]:
             raise ValueError("Move must be made by BLACK or WHITE player")
+
         if self.is_legal(position, color):
             # places the piece and update piece counts
             px, py = position
             self.tiles[px][py] = color
             self.piece_count[color] += 1
             self.piece_count[self.EMPTY] -= 1
+
             for direc in self.DIRECTIONS:
                 self.flip_tiles(position, color, direc)
+
             # resets legal moves
             self._legal_moves[self.BLACK], self._legal_moves[self.WHITE] = None, None
             return True
+
         return False  # guards against illegal moves
 
     def flip_tiles(self, origin, color, direction):
@@ -197,18 +260,21 @@ class Board(object):
         Traverses the board in the given direction,
         transforming the color of appropriate tiles
         :param origin: where the traversal will begin
-        :param color:
-        :param direction:
+        :param color: new color of the pieces
+        :param direction: direction of traversal (see the constants on the beginning of the class)
         :return:
         """
         destination = self.find_bracket(origin, color, direction)  # move, player, board, direction)
         if not destination:
             return
+        self.flipped.add(destination)  # for highlighting purposes (see decorated_str)
         ox, oy = origin
         dx, dy = direction
+
         nx, ny = ox + dx, oy + dy  # n stands for 'next'
+
         opp = self.opponent(color)
-        self.flipped = set()
+
         while (nx, ny) != destination:
             # flips the tile and updates piece counts
             self.flipped.add((nx, ny))
@@ -226,10 +292,12 @@ class Board(object):
         if self._legal_moves[color] is None:
             # construct the list of legal moves only once
             self._legal_moves[color] = list()
+
             if self.piece_count[color] > self.piece_count[self.EMPTY]:
                 self.find_legal_moves_dense(color)
             else:
                 self.find_legal_moves_sparse(color)
+
         return self._legal_moves[color]
 
     def find_legal_moves_dense(self, color):
@@ -240,6 +308,7 @@ class Board(object):
         """
         # test if every empty tile on the board is a legal move
         tiles = [(x, y) for x in range(8) for y in range(8) if self.tiles[x][y] == self.EMPTY]
+
         for x, y in tiles:
             if self.tiles[x][y] == self.EMPTY:  # and any(map(hasbracket, self.DIRECTIONS)):
                 # performs the 'inline' any:
@@ -258,6 +327,7 @@ class Board(object):
         """
         # test if every empty tile on the board is a legal move
         tiles = [(x, y) for x in range(8) for y in range(8) if self.tiles[x][y] == color]
+
         for x, y in tiles:
             if self.tiles[x][y] == color:
                 for direc in self.DIRECTIONS:
@@ -274,9 +344,12 @@ class Board(object):
         """
         # test if every empty tile on the board is a legal move
         tiles = [(x, y) for x in range(8) for y in range(8) if self.tiles[x][y] == self.EMPTY]
+
         for x, y in tiles:
             # self._legal_moves[color] = [(y, x) for x, y in tiles if self.is_legal((x, y), color)]
+
             hasbracket = lambda direction: self.find_bracket((x, y), color, direction)
+
             if self.tiles[x][y] == self.EMPTY and any(map(hasbracket, self.DIRECTIONS)):
                 return True
         return False
@@ -289,6 +362,7 @@ class Board(object):
         """
         if color == self.EMPTY:
             raise ValueError('Empty has no opponent.')
+
         if color == self.WHITE:
             return self.BLACK
         else:
@@ -298,40 +372,50 @@ class Board(object):
         """
         Prints the string representation of the board
         :return:
+        TODO recreate this function without colors, bells and whistles
         """
+
         print(self.decorated_str())
 
-    def decorated_str(self, pretty=False, highlight=None):
+    def decorated_str(self, colors=True, move=None, highlight_flipped=False):
         """
         Returns the string representation of the board
         decorated with coordinates for board positions
-        :param highlight: tuple with position (row, col) to highlight
+        :param highlight_flipped: whether to highlight flipped pieces
+        :param colsep: whether to put column separators
+        :param move: tuple with position (row, col) to highlight the move done
         :return: str
-        TODO look at https://pypi.org/project/colorama/ and/or https://docs.python.org/3/howto/curses.html
         """
-        if pretty:
-            string = 'x   0   1   2   3   4   5   6   7 \n'
-            for i, row in enumerate(self.tiles):
-                string += '  -' + '----' * 8 + '\n'
-                string += '%d | %s |\n' % (i, ' | '.join(row))
-            string += '  -' + '----' * 8 + '\n'
-        else:
+        if colors:  # returns a string to be printed with tim.print
             string = 'x 0 1 2 3 4 5 6 7\n'
             for i, row in enumerate(self.tiles):
-                if highlight is None:
+                string += f'{i}[@green]'  # line number
+                for j, piece in enumerate(row):
+                    if (i, j) == move:
+                        string += f' [@red]{self.PIECEMAP[piece]}[@green]'
+                    elif (i, j) in self.flipped and highlight_flipped:
+                        string += f' [@yellow]{self.PIECEMAP[piece]}[@green]'
+                    else:
+                        string += f'[@green] {self.PIECEMAP[piece]}'
+                string += ' [/bg]\n'
+            string.replace('.', '-')
+        else:  # returns a simple string to be printed normally
+            string = 'x 0 1 2 3 4 5 6 7\n'
+            for i, row in enumerate(self.tiles):
+                if move is None or highlight_flipped == False:
                     string += f'{i} {" ".join(row)} \n'
                 else:
                     string += f'{i}'
                     for j, piece in enumerate(row):
-                        if (i, j) == highlight or (i, j) in self.flipped:
+                        if (i, j) == move or (i, j) in self.flipped:
                             string += f'*{piece}'
                             if j == 7:
                                 string += '*'  # adds sign to the right of boundary piece
-                        elif (i, j-1) == highlight or (i, j-1) in self.flipped:  # shows sign at the piece to the right of the highlighted one
+                        elif (i, j-1) == move or (i, j-1) in self.flipped:  # shows sign at the piece to the right of the highlighted one
                             string += f'*{piece}'
                         else:
                             string += f' {piece}'
-                    string += '\n'
+                    string += '\n'          
         return string
 
     def __str__(self):
@@ -342,4 +426,5 @@ class Board(object):
         string = ''
         for i, row in enumerate(self.tiles):
             string += '%s\n' % ''.join(row)
+
         return string
