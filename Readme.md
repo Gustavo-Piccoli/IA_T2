@@ -8,14 +8,14 @@ Função de Avaliação:
 A função de avaliação leva em conta vários aspectos (talvez até mais do que deveria). Os aspectos são: número de peças do agente, número de peças  do agente no centro, número de movimentos legais do oponente, número de movimentos legais do agente, número de corners do agente, número de corners do oponente, riscos do agente entregar um corner, número de peças do agente no "outer square", penalidade de sequência longas de peças do agente na fronteira de risco (explicarei logo mais), número de peças do agente que foram colocadas em X-tiles (explicarei logo mais).
 
 A fronteira de risco é marcada em X a seguir: 
-                                     ```. . . . . . . .
+                                     """. . . . . . . .
                                       . X X X X X X .
                                       . X . . . . X .
                                       . X . . . . X .
                                       . X . . . . x .
                                       . X . . . . X .
                                       . X X X X X X .
-                                      . . . . . . . .```
+                                      . . . . . . . ."""
 Os X-tiles são marcados pelos X a seguir:
                                       ```. . . . . . . .
                                       . X . . . . X .
